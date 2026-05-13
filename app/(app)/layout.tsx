@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/app-shell/sidebar";
 import { TopBar } from "@/components/app-shell/topbar";
 import { BottomNav } from "@/components/app-shell/bottom-nav";
 import { CommandPalette } from "@/components/app-shell/command-palette";
+import { SpeedyChat } from "@/components/app-shell/speedy-chat";
 
 export default async function AppLayout({
   children,
@@ -54,6 +55,7 @@ export default async function AppLayout({
           status: e.status,
         }))}
       />
+      <SpeedyChat />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import type { RoleName } from "@prisma/client";
 import { Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-items";
+import { SpeedyChatTrigger } from "./speedy-chat";
 
 export function Sidebar({ roles }: { roles: RoleName[] }) {
   const pathname = usePathname();
@@ -37,6 +38,10 @@ export function Sidebar({ roles }: { roles: RoleName[] }) {
           <NavGroup items={admin} pathname={pathname} />
         </>
       )}
+
+      <div className="mt-auto pt-4 border-t border-border/30">
+        <SpeedyChatTrigger />
+      </div>
     </aside>
   );
 }

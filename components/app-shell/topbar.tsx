@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-items";
 import { signOutAction } from "@/server/actions/auth";
 import { NotificationBell } from "./notification-bell";
+import { SpeedyChatTrigger } from "./speedy-chat";
 
 type Props = {
   user: { displayName: string; email: string; roles: RoleName[] };
@@ -136,6 +137,7 @@ export function TopBar({ user }: Props) {
 
       <div className="ml-auto flex items-center gap-1.5">
         <CommandTrigger />
+        <SpeedyChatTrigger compact />
         <ThemeToggle />
         <NotificationBell />
 
