@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -65,23 +66,26 @@ export function StatCard({
   sub,
   tone = "primary",
   delay = 0,
+  href,
 }: {
   label: string;
   value: number;
   sub: string;
   tone?: Tone;
   delay?: number;
+  href?: string;
 }) {
   const count = useCountUp(value);
   const { gradient, shadow } = toneMap[tone];
 
-  return (
+  const cardContent = (
     <Card
       className={cn(
         "glass-strong relative overflow-hidden p-5",
         "animate-fade-in-up will-change-transform",
         "transition-all duration-300 ease-out",
         "hover:-translate-y-1.5",
+        href && "cursor-pointer",
         shadow,
       )}
       style={{ animationDelay: `${delay}ms`, animationFillMode: "both" }}
@@ -105,4 +109,14 @@ export function StatCard({
       </div>
     </Card>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="focus-ring rounded-lg">
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return cardContent;
 }

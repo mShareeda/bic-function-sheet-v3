@@ -192,7 +192,7 @@ export default async function DashboardPage() {
   if (isAdmin(u) || hasRole(u, "COORDINATOR")) {
     const coordScope = isAdmin(u) ? {} : { coordinatorId: u.id };
 
-    const [upcomingEvents, statusGroups, unassignedReqs, unreadCount, liveCount] =
+    const [upcomingEvents, statusGroups, unassignedReqs, unreadCount, liveCount, unassignedCount] =
       await Promise.all([
         prisma.event.findMany({
           where: {
@@ -201,7 +201,6 @@ export default async function DashboardPage() {
           },
           include: { coordinator: { select: { displayName: true } } },
           orderBy: { eventDate: "asc" },
-          take: 10,
         }),
         prisma.event.groupBy({
           by: ["status"],
@@ -231,6 +230,9 @@ export default async function DashboardPage() {
         prisma.event.count({
           where: { ...coordScope, status: "LIVE" },
         }),
+        prisma.event.count({
+          where: { ...coordScope, coordinatorId: null, status: { in: ACTIVE_STATUSES } },
+        }),
       ]);
 
     return (
@@ -257,6 +259,7 @@ export default async function DashboardPage() {
             sub="Events in the next 30 days"
             tone="primary"
             delay={0}
+            href={`/events?dateMin=${now.toISOString().split('T')[0]}&dateMax=${in30.toISOString().split('T')[0]}`}
           />
           <StatCard
             label="Live now"
@@ -264,13 +267,15 @@ export default async function DashboardPage() {
             sub="Currently running"
             tone="live"
             delay={80}
+            href="/events?status=LIVE"
           />
           <StatCard
             label="Unassigned"
-            value={unassignedReqs.length}
-            sub="Requirements with no owner"
+            value={unassignedCount}
+            sub="Events without coordinator"
             tone="warning"
             delay={160}
+            href="/events?unassigned=true"
           />
           <StatCard
             label="Unread alerts"
@@ -278,6 +283,7 @@ export default async function DashboardPage() {
             sub="Notifications waiting"
             tone="info"
             delay={240}
+            href="/notifications"
           />
         </div>
 
@@ -397,7 +403,6 @@ export default async function DashboardPage() {
         },
         include: { coordinator: { select: { displayName: true } } },
         orderBy: { eventDate: "asc" },
-        take: 10,
       }),
       prisma.departmentRequirement.findMany({
         where: {
