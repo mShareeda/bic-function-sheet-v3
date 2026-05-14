@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { toZonedTime, format } from "date-fns-tz";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; // force fresh deployment
 
 const TZ = process.env.APP_TIMEZONE ?? "Asia/Bahrain";
 
