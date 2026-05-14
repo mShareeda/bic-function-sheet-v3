@@ -102,8 +102,6 @@ export async function POST(req: NextRequest) {
         title: true,
         status: true,
         eventDate: true,
-        liveStart: true,
-        liveEnd: true,
         coordinator: { select: { displayName: true } },
         departments: { select: { department: { select: { name: true } } } },
         eventVenues: { select: { venue: { select: { name: true } } } },
