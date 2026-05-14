@@ -19,8 +19,6 @@ function buildSystemPrompt(ctx: {
     title: string;
     status: string;
     eventDate: Date;
-    liveStart: Date | null;
-    liveEnd: Date | null;
     coordinator: { displayName: string } | null;
     departments: Array<{ department: { name: string } }>;
     eventVenues: Array<{ venue: { name: string } }>;
