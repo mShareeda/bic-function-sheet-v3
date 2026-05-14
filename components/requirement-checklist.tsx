@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { toggleTaskCompletionAction } from "@/server/actions/task-completion";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -52,11 +51,13 @@ export function RequirementChecklist({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        <Checkbox
+        <input
+          type="checkbox"
           checked={isCompleted}
-          onCheckedChange={handleToggle}
+          onChange={handleToggle}
           disabled={loading}
-          className="mt-1"
+          className="mt-1 h-4 w-4 cursor-pointer rounded border border-input"
+          aria-label="Toggle task completion"
         />
         <div className="flex-1">
           {isCompleted && completedBy && completedAt && (

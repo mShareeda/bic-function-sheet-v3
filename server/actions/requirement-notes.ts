@@ -1,6 +1,6 @@
 "use server";
 
-import { requireSession } from "@/lib/auth";
+import { requireSession } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 import { canEditDeptRequirements, canViewClientDetails } from "@/lib/authz";
 import { logAudit } from "@/lib/audit";

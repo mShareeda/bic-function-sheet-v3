@@ -72,6 +72,7 @@ export default async function DeptRequirementsPage({
   // Filter notes per auth rule; serialize dates for client component
   const requirementsWithNotes = requirements.map((r) => ({
     ...r,
+    completedById: r.completedById || undefined,
     completedBy: r.completedById ? completedByUsers.get(r.completedById) || null : null,
     managerNotes: r.managerNotes.filter((n) =>
       canViewManagerNote(u, event, n.authorId)
