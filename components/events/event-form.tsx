@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,10 +33,13 @@ function defaultDateTime(offsetDays = 0, hours = 9) {
 export function EventForm({
   coordinators,
   existing,
+  showBackButton = false,
 }: {
   coordinators: Coordinator[];
   existing?: EventData;
+  showBackButton?: boolean;
 }) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -152,9 +157,21 @@ export function EventForm({
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : existing ? "Save changes" : "Create event"}
-      </Button>
+      <div className="flex items-center gap-3">
+        {showBackButton && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            disabled={pending}
+          >
+            <ChevronLeft className="h-4 w-4" /> Back
+          </Button>
+        )}
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : existing ? "Save changes" : "Create event"}
+        </Button>
+      </div>
     </form>
   );
 }

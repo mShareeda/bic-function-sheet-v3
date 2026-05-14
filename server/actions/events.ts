@@ -259,6 +259,7 @@ const wizardSchema = z.object({
   liveEnd: z.string().min(1),
   breakdownStart: z.string().min(1),
   breakdownEnd: z.string().min(1),
+  venueIds: z.array(z.string()).default([]),
   agenda: z.array(wizardAgendaSchema),
   departments: z.array(wizardDepartmentSchema),
   sendMode: z.enum(["draft", "full", "provisional"]).optional(),
@@ -306,6 +307,15 @@ export async function createEventCompleteAction(
         createdById: actor.id,
       },
     });
+
+    if (d.venueIds.length > 0) {
+      await tx.eventVenue.createMany({
+        data: d.venueIds.map((venueId) => ({
+          eventId: created.id,
+          venueId,
+        })),
+      });
+    }
 
     if (d.agenda.length > 0) {
       await tx.agendaItem.createMany({

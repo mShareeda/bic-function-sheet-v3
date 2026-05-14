@@ -63,6 +63,8 @@ type WizardState = {
   // step 3
   agenda: AgendaDraft[];
   // step 4
+  venueIds: string[];
+  // step 5
   departments: DeptDraft[];
 };
 
@@ -70,6 +72,7 @@ const STEPS = [
   { key: "details", label: "Event details" },
   { key: "schedule", label: "Schedule" },
   { key: "agenda", label: "Agenda" },
+  { key: "venues", label: "Venues" },
   { key: "departments", label: "Departments" },
   { key: "review", label: "Review" },
 ] as const;
@@ -134,6 +137,7 @@ export function EventWizard({
     breakdownStart: todayMidnight,
     breakdownEnd: todayMidnight,
     agenda: [],
+    venueIds: [],
     departments: [],
   }));
 
@@ -217,6 +221,7 @@ export function EventWizard({
       liveEnd: state.liveEnd,
       breakdownStart: state.breakdownStart,
       breakdownEnd: state.breakdownEnd,
+      venueIds: state.venueIds,
       agenda: state.agenda
         .filter((a) => a.description.trim())
         .map((a) => ({
@@ -284,6 +289,13 @@ export function EventWizard({
               }
             />
           )}
+          {step === "venues" && (
+            <VenuesStep
+              state={state}
+              set={set}
+              venues={venues}
+            />
+          )}
           {step === "departments" && (
             <DepartmentsStep
               state={state}
@@ -317,13 +329,24 @@ export function EventWizard({
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button
-          variant="outline"
-          onClick={goBack}
-          disabled={stepIndex === 0 || pending}
-        >
-          <ChevronLeft className="h-4 w-4" /> Back
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={goBack}
+            disabled={(stepIndex === 0 || pending) && step !== "review"}
+          >
+            <ChevronLeft className="h-4 w-4" /> Back
+          </Button>
+          {step === "review" && (
+            <Button
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={pending}
+            >
+              <ChevronLeft className="h-4 w-4" /> Go back
+            </Button>
+          )}
+        </div>
 
         {step !== "review" ? (
           <Button onClick={goNext} disabled={pending}>
@@ -738,7 +761,65 @@ function AgendaStep({
   );
 }
 
-// ── Step 4: Departments + Requirements ───────────────────────────────────────
+// ── Step 4: Venues ───────────────────────────────────────────────────────────
+
+function VenuesStep({
+  state,
+  set,
+  venues,
+}: {
+  state: WizardState;
+  set: <K extends keyof WizardState>(k: K, v: WizardState[K]) => void;
+  venues: Venue[];
+}) {
+  function toggle(venueId: string) {
+    if (state.venueIds.includes(venueId)) {
+      set("venueIds", state.venueIds.filter((id) => id !== venueId));
+    } else {
+      set("venueIds", [...state.venueIds, venueId]);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <StepHeader
+        title="Event venues"
+        description="Select the venues where this event will take place."
+      />
+
+      {venues.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No venues configured. Ask an admin to add some.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {venues.map((v) => {
+            const selected = state.venueIds.includes(v.id);
+            return (
+              <label
+                key={v.id}
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 transition-colors",
+                  selected ? "border-primary/50 bg-primary/5" : "border-border/50 bg-surface/30",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={() => toggle(v.id)}
+                  className="h-4 w-4 accent-primary"
+                />
+                <span className="text-sm font-medium">{v.name}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Step 5: Departments + Requirements ───────────────────────────────────────
 
 function DepartmentsStep({
   state,

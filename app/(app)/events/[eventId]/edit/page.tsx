@@ -54,7 +54,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ even
     <div className="space-y-8 max-w-2xl">
       <h1 className="text-2xl font-bold">Edit event</h1>
 
-      <EventForm coordinators={coordinators} existing={event} />
+      <EventForm coordinators={coordinators} existing={event} showBackButton={true} />
 
       <Card>
         <CardHeader>
