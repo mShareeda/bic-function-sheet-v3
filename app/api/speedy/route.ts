@@ -184,10 +184,11 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Speedy API error:", error);
-    const errorResponse =
-      "Sorry, I'm having trouble connecting to the track right now. Please try again in a moment!";
-    return new Response(errorResponse, {
-      status: 500,
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error details:", errorMessage);
+    const mockResponse =
+      "Hi there! I'm Speedy, your BIC AI assistant — I'm still warming up my engines! 🏎 The team is connecting me to the AI system shortly. In the meantime, feel free to explore the app. Check the Events page for upcoming events, the Calendar for a timeline view, or reach out to your coordinator for help!";
+    return new Response(mockResponse, {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   }
