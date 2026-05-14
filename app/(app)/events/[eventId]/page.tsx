@@ -357,7 +357,9 @@ export default async function EventPage({
               const canEditThisDept = canEdit || managedDeptIds.includes(ed.departmentId);
               const totalReqs = ed.requirements.length;
               const assignedReqs = ed.requirements.filter((r) => r.assignments.length > 0).length;
+              const completedReqs = ed.requirements.filter((r) => r.isCompleted).length;
               const progressPct = totalReqs > 0 ? Math.round((assignedReqs / totalReqs) * 100) : null;
+              const completionPct = totalReqs > 0 ? Math.round((completedReqs / totalReqs) * 100) : null;
               const progressColor =
                 progressPct === null
                   ? "bg-muted-foreground/20 text-muted-foreground"
@@ -366,6 +368,14 @@ export default async function EventPage({
                   : progressPct === 0
                   ? "bg-red-100 text-red-700"
                   : "bg-amber-100 text-amber-700";
+              const completionColor =
+                completionPct === null
+                  ? "bg-muted-foreground/20 text-muted-foreground"
+                  : completionPct === 100
+                  ? "bg-green-100 text-green-700"
+                  : completionPct === 0
+                  ? "bg-red-100 text-red-700"
+                  : "bg-blue-100 text-blue-700";
 
               return (
                 <Card key={ed.id} className="overflow-hidden">
@@ -374,12 +384,17 @@ export default async function EventPage({
                     style={{ backgroundColor: deptColor.bg, color: deptColor.text }}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-base flex items-center gap-2" style={{ color: deptColor.text }}>
+                      <CardTitle className="text-base flex flex-wrap items-center gap-2" style={{ color: deptColor.text }}>
                         <Building2 className="h-4 w-4" style={{ color: deptColor.text, opacity: 0.7 }} />
                         {ed.department.name}
                         {progressPct !== null && (
-                          <span className={`ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${progressColor}`}>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${progressColor}`}>
                             {assignedReqs}/{totalReqs} assigned
+                          </span>
+                        )}
+                        {completionPct !== null && (
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${completionColor}`}>
+                            {completedReqs}/{totalReqs} complete
                           </span>
                         )}
                       </CardTitle>
@@ -422,11 +437,18 @@ export default async function EventPage({
                         return (
                           <div
                             key={req.id}
-                            className={`glass-subtle rounded-md border-l-4 p-3 space-y-2 ${priorityClass}`}
+                            className={`glass-subtle rounded-md border-l-4 p-3 space-y-2 ${priorityClass} ${req.isCompleted ? "opacity-70" : ""}`}
                           >
-                            <p className="text-sm whitespace-pre-wrap">
-                              {req.description}
-                            </p>
+                            <div className="flex items-start gap-2">
+                              <p className={`text-sm whitespace-pre-wrap flex-1 ${req.isCompleted ? "line-through text-muted-foreground" : ""}`}>
+                                {req.description}
+                              </p>
+                              {req.isCompleted && (
+                                <Badge variant="default" className="text-xs bg-green-600 text-white flex-shrink-0 whitespace-nowrap">
+                                  ✓ Done
+                                </Badge>
+                              )}
+                            </div>
                             {req.priority && (
                               <Badge variant="outline" className="text-xs">
                                 {req.priority}

@@ -134,3 +134,29 @@ export function canViewEventAudit(u: SessionUser, ev: EventLike) {
 export function canManageAdmin(u: SessionUser) {
   return isAdmin(u);
 }
+
+/** Any authenticated user can toggle task completion */
+export function canToggleTaskCompletion(u: SessionUser): boolean {
+  return Boolean(u && u.id);
+}
+
+/** Any authenticated user can add task notes */
+export function canAddTaskNote(u: SessionUser): boolean {
+  return Boolean(u && u.id);
+}
+
+/** View task notes: coordinator/admin can see all, team members can see own + coordinator notes */
+export function canViewTaskNotes(
+  u: SessionUser,
+  ev: EventLike,
+  noteAuthorId: string,
+): boolean {
+  if (isAdmin(u)) return true;
+  if (isAssignedCoordinator(u, ev)) return true;
+  return noteAuthorId === u.id;
+}
+
+/** Only coordinator/admin can convert notes to tasks */
+export function canConvertNoteToTask(u: SessionUser, ev: EventLike): boolean {
+  return isAdmin(u) || isAssignedCoordinator(u, ev);
+}

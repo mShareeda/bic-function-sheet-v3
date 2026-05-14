@@ -39,6 +39,10 @@ export default async function DeptRequirementsPage({
         include: { uploadedBy: { select: { displayName: true } } },
         orderBy: { createdAt: "asc" },
       },
+      completionLogs: {
+        include: { actor: { select: { id: true, displayName: true } } },
+        orderBy: { completedAt: "desc" },
+      },
     },
     orderBy: { sortOrder: "asc" },
   });
@@ -51,9 +55,24 @@ export default async function DeptRequirementsPage({
 
   const isCoordOrAdmin = canEditEvent(u, event);
 
+  // Get completed by user if task is marked complete
+  const completedByUsers = new Map<string, { displayName: string }>();
+  for (const req of requirements) {
+    if (req.completedById) {
+      if (!completedByUsers.has(req.completedById)) {
+        const user = await prisma.user.findUnique({
+          where: { id: req.completedById },
+          select: { displayName: true },
+        });
+        if (user) completedByUsers.set(req.completedById, user);
+      }
+    }
+  }
+
   // Filter notes per auth rule; serialize dates for client component
   const requirementsWithNotes = requirements.map((r) => ({
     ...r,
+    completedBy: r.completedById ? completedByUsers.get(r.completedById) || null : null,
     managerNotes: r.managerNotes.filter((n) =>
       canViewManagerNote(u, event, n.authorId)
     ),
@@ -81,6 +100,8 @@ export default async function DeptRequirementsPage({
         canAssign={isCoordOrAdmin || managedDeptIds.includes(deptId)}
         canAddNotes={managedDeptIds.includes(deptId) || isCoordOrAdmin}
         canManageAttachments={isCoordOrAdmin || managedDeptIds.includes(deptId)}
+        currentUserId={u.id}
+        isCoordinator={isCoordOrAdmin}
       />
     </div>
   );

@@ -2,10 +2,10 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { format } from "date-fns";
 import { CheckSquare } from "lucide-react";
+import { MyTasksItem } from "@/components/my-tasks-item";
 
 export default async function MyTasksPage() {
   const session = await auth();
@@ -18,11 +18,29 @@ export default async function MyTasksPage() {
         include: {
           department: { select: { name: true } },
           event: { select: { id: true, title: true, eventDate: true, status: true } },
+          completionLogs: {
+            include: { actor: { select: { id: true, displayName: true } } },
+            orderBy: { completedAt: "desc" },
+          },
         },
       },
     },
     orderBy: { requirement: { event: { eventDate: "asc" } } },
   });
+
+  // Fetch user data for completed-by info
+  const completedByUsers = new Map<string, { displayName: string }>();
+  for (const a of assignments) {
+    if (a.requirement.completedById) {
+      if (!completedByUsers.has(a.requirement.completedById)) {
+        const user = await prisma.user.findUnique({
+          where: { id: a.requirement.completedById },
+          select: { displayName: true },
+        });
+        if (user) completedByUsers.set(a.requirement.completedById, user);
+      }
+    }
+  }
 
   // Group by event
   const byEvent = new Map<string, typeof assignments>();
@@ -81,21 +99,22 @@ export default async function MyTasksPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {items.map((a) => (
-                <div key={a.requirementId} className="glass-subtle rounded-md p-3">
-                  <p className="text-sm whitespace-pre-wrap">
-                    {a.requirement.description}
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {a.requirement.department.name}
-                    </Badge>
-                    {a.requirement.priority && (
-                      <Badge variant="secondary" className="text-xs">
-                        {a.requirement.priority}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
+                <MyTasksItem
+                  key={a.requirementId}
+                  requirementId={a.requirement.id}
+                  eventId={event.id}
+                  description={a.requirement.description}
+                  departmentName={a.requirement.department.name}
+                  priority={a.requirement.priority}
+                  isCompleted={a.requirement.isCompleted}
+                  completedAt={a.requirement.completedAt}
+                  completedBy={
+                    a.requirement.completedById
+                      ? completedByUsers.get(a.requirement.completedById) || null
+                      : null
+                  }
+                  completionLogs={a.requirement.completionLogs}
+                />
               ))}
             </CardContent>
           </Card>

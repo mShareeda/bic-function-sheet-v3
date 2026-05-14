@@ -29,24 +29,34 @@ import {
   deleteRequirementAction,
   assignTeamMemberAction,
   unassignTeamMemberAction,
-  addManagerNoteAction,
   reorderRequirementsAction,
 } from "@/server/actions/requirements";
 import { AttachmentPanel } from "@/components/events/attachment-panel";
 import type { AttachmentItem } from "@/components/events/attachment-panel";
+import { RequirementChecklist } from "@/components/requirement-checklist";
+import { RequirementNotesSection } from "@/components/requirement-notes-section";
 
 type Member = { id: string; displayName: string };
 type Note = { id: string; body: string; author: { id: string; displayName: string }; createdAt: Date };
 type Assignment = { userId: string; user: { id: string; displayName: string } };
+type CompletionLog = {
+  id: string;
+  action: string;
+  completedAt: Date;
+  actor: { id: string; displayName: string };
+};
 type Requirement = {
   id: string; description: string; priority: string | null; sortOrder: number;
+  isCompleted?: boolean; completedAt?: Date | null; completedById?: string;
   assignments: Assignment[]; managerNotes: Note[]; attachments: AttachmentItem[];
+  completionLogs?: CompletionLog[];
+  completedBy?: { displayName: string } | null;
 };
 
 function SortableRequirementCard({
   req, eventId, deptId, editId, setEditId, pending,
   submitReq, delReq, assign, unassign,
-  canAssign, canAddNotes, canManageAttachments, deptMembers, error,
+  canAssign, canAddNotes, canManageAttachments, deptMembers, error, currentUserId, isCoordinator,
 }: {
   req: Requirement; eventId: string; deptId: string;
   editId: string | null; setEditId: (id: string | null) => void;
@@ -57,7 +67,9 @@ function SortableRequirementCard({
   unassign: (reqId: string, userId: string) => void;
   canAssign: boolean; canAddNotes: boolean; canManageAttachments: boolean;
   deptMembers: Member[]; error: string | null;
+  currentUserId: string; isCoordinator: boolean;
 }) {
+  const [notesRefresh, setNotesRefresh] = useState(0);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: req.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -89,6 +101,21 @@ function SortableRequirementCard({
                 </div>
               </div>
 
+              {/* Task Completion Checklist */}
+              {req.isCompleted !== undefined && (
+                <div className="border-t pt-3">
+                  <RequirementChecklist
+                    requirementId={req.id}
+                    eventId={eventId}
+                    isCompleted={req.isCompleted || false}
+                    completedAt={req.completedAt || null}
+                    completedBy={req.completedBy || null}
+                    completionLogs={req.completionLogs || []}
+                    onToggle={() => setNotesRefresh(prev => prev + 1)}
+                  />
+                </div>
+              )}
+
                 {/* Assignments */}
                 {canAssign && (
                   <div className="space-y-2">
@@ -111,22 +138,16 @@ function SortableRequirementCard({
                   </div>
                 )}
 
-                {/* Manager notes */}
-                {req.managerNotes.length > 0 && (
-                  <div className="space-y-1 border-t pt-2">
-                    <p className="text-xs font-medium text-muted-foreground">Notes (visible to coordinator only)</p>
-                    {req.managerNotes.map((n) => (
-                      <div key={n.id} className="text-sm bg-yellow-50 border border-yellow-200 rounded p-2">
-                        <p>{n.body}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{n.author.displayName}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {canAddNotes && (
-                  <NoteForm requirementId={req.id} eventId={eventId} pending={pending} />
-                )}
+                {/* Team Notes Section */}
+                <RequirementNotesSection
+                  requirementId={req.id}
+                  eventId={eventId}
+                  departmentId={deptId}
+                  notes={req.managerNotes}
+                  currentUserId={currentUserId}
+                  isCoordinator={isCoordinator}
+                  onNoteAdded={() => setNotesRefresh(prev => prev + 1)}
+                />
 
                 {/* Attachments */}
                 {(canManageAttachments || req.attachments.length > 0) && (
@@ -150,10 +171,12 @@ function SortableRequirementCard({
 
 export function RequirementsEditor({
   eventId, deptId, requirements, deptMembers, canAssign, canAddNotes, canManageAttachments,
+  currentUserId, isCoordinator,
 }: {
   eventId: string; deptId: string;
   requirements: Requirement[]; deptMembers: Member[];
   canAssign: boolean; canAddNotes: boolean; canManageAttachments: boolean;
+  currentUserId: string; isCoordinator: boolean;
 }) {
   const [orderedReqs, setOrderedReqs] = useState(requirements);
   const [showAdd, setShowAdd] = useState(false);
@@ -233,6 +256,8 @@ export function RequirementsEditor({
               canManageAttachments={canManageAttachments}
               deptMembers={deptMembers}
               error={error}
+              currentUserId={currentUserId}
+              isCoordinator={isCoordinator}
             />
           ))}
           {showAdd ? (
@@ -292,23 +317,3 @@ function AssignSelect({ requirementId, members, assignedIds, onAssign, pending }
   );
 }
 
-function NoteForm({ requirementId, eventId, pending }: { requirementId: string; eventId: string; pending: boolean }) {
-  const [body, setBody] = useState("");
-  const [localPending, startTransition] = useTransition();
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!body.trim()) return;
-    startTransition(async () => {
-      await addManagerNoteAction(requirementId, eventId, body.trim());
-      setBody("");
-    });
-  }
-
-  return (
-    <form onSubmit={submit} className="flex gap-2 border-t pt-2">
-      <Input value={body} onChange={(e) => setBody(e.target.value)} placeholder="Add a note (visible to coordinator only)…" className="flex-1 text-sm" />
-      <Button type="submit" size="sm" variant="outline" disabled={localPending || pending || !body.trim()}>Send</Button>
-    </form>
-  );
-}

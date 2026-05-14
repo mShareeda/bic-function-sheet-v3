@@ -80,6 +80,7 @@ model User {
   assignedRequirements   RequirementAssignment[] @relation("RequirementAssignee")
   assignmentsCreated     RequirementAssignment[] @relation("RequirementAssigner")
   authoredNotes          RequirementNote[]
+  completionLogs         RequirementCompletionLog[]
   uploadedAttachments    Attachment[]
   notifications          Notification[]
   auditEntries           AuditLog[]
@@ -197,14 +198,15 @@ model Event {
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
 
-  coordinator  User?                   @relation("CoordinatorEvents", fields: [coordinatorId], references: [id])
-  createdBy    User                    @relation("CreatedEvents", fields: [createdById], references: [id])
-  agendaItems  AgendaItem[]
-  departments  EventDepartment[]
-  requirements DepartmentRequirement[]
-  attachments  Attachment[]
-  eventVenues  EventVenue[]
-  auditLogs    AuditLog[]
+  coordinator      User?                       @relation("CoordinatorEvents", fields: [coordinatorId], references: [id])
+  createdBy        User                        @relation("CreatedEvents", fields: [createdById], references: [id])
+  agendaItems      AgendaItem[]
+  departments      EventDepartment[]
+  requirements     DepartmentRequirement[]
+  attachments      Attachment[]
+  eventVenues      EventVenue[]
+  auditLogs        AuditLog[]
+  completionLogs   RequirementCompletionLog[]
 
   @@index([eventDate])
   @@index([status])
@@ -253,13 +255,17 @@ model DepartmentRequirement {
   sortOrder         Int      @default(0)
   updatedAt         DateTime @updatedAt
   updatedById       String?
+  isCompleted       Boolean  @default(false)
+  completedAt       DateTime?
+  completedById     String?
 
-  event           Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  department      Department              @relation(fields: [departmentId], references: [id])
-  eventDepartment EventDepartment         @relation(fields: [eventDepartmentId], references: [id], onDelete: Cascade)
+  event           Event                       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  department      Department                  @relation(fields: [departmentId], references: [id])
+  eventDepartment EventDepartment             @relation(fields: [eventDepartmentId], references: [id], onDelete: Cascade)
   assignments     RequirementAssignment[]
   managerNotes    RequirementNote[]
   attachments     Attachment[]
+  completionLogs  RequirementCompletionLog[]
 
   @@index([eventId, departmentId])
 }
@@ -290,6 +296,24 @@ model RequirementNote {
   author      User                  @relation(fields: [authorId], references: [id])
 
   @@index([requirementId])
+}
+
+model RequirementCompletionLog {
+  id            String   @id @default(cuid())
+  requirementId String
+  eventId       String
+  action        String   // "COMPLETED" or "UNCOMPLETED"
+  actorId       String
+  completedAt   DateTime @default(now())
+  notes         String?  @db.Text
+
+  requirement DepartmentRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  actor       User                  @relation(fields: [actorId], references: [id])
+
+  @@index([requirementId])
+  @@index([eventId])
+  @@index([actorId])
 }
 
 // =====================
