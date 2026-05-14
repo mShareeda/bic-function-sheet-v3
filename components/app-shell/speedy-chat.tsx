@@ -141,7 +141,8 @@ export function SpeedyChat() {
       });
 
       if (!res.ok) {
-        throw new Error(`${res.status}`);
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
       }
 
       if (!res.body) {
@@ -167,14 +168,15 @@ export function SpeedyChat() {
           ),
         );
       }
-    } catch {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
             ? {
                 ...m,
                 content:
-                  "Oops, I hit a bump on the track! 🏎 Please try again in a moment.",
+                  `Oops, I hit a bump on the track! 🏎 ${errorMessage}`,
               }
             : m,
         ),

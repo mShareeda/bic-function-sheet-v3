@@ -145,39 +145,50 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction: systemPrompt,
-  });
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      systemInstruction: systemPrompt,
+    });
 
-  const history = messages.slice(0, -1).map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
+    const history = messages.slice(0, -1).map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
 
-  const lastMessage = messages[messages.length - 1];
+    const lastMessage = messages[messages.length - 1];
 
-  const chat = model.startChat({ history });
-  const result = await chat.sendMessageStream(lastMessage.content);
+    const chat = model.startChat({ history });
+    const result = await chat.sendMessageStream(lastMessage.content);
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
-      try {
-        for await (const chunk of result.stream) {
-          const text = chunk.text();
-          if (text) controller.enqueue(encoder.encode(text));
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        try {
+          for await (const chunk of result.stream) {
+            const text = chunk.text();
+            if (text) controller.enqueue(encoder.encode(text));
+          }
+        } catch (error) {
+          console.error("Stream chunk error:", error);
+          controller.error(new Error("Stream error"));
+        } finally {
+          controller.close();
         }
-      } catch {
-        controller.error(new Error("Stream error"));
-      } finally {
-        controller.close();
-      }
-    },
-  });
+      },
+    });
 
-  return new Response(stream, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  } catch (error) {
+    console.error("Speedy API error:", error);
+    const errorResponse =
+      "Sorry, I'm having trouble connecting to the track right now. Please try again in a moment!";
+    return new Response(errorResponse, {
+      status: 500,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
 }
