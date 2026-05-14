@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { toZonedTime, format } from "date-fns-tz";
 
 export const dynamic = "force-dynamic";
@@ -13,68 +12,122 @@ type ChatMessage = {
   content: string;
 };
 
-function buildSystemPrompt(ctx: {
-  datetime: string;
-  events: Array<{
-    title: string;
-    status: string;
-    eventDate: Date;
-    coordinator: { displayName: string } | null;
-    departments: Array<{ department: { name: string } }>;
-    eventVenues: Array<{ venue: { name: string } }>;
-  }>;
-  departments: Array<{ name: string }>;
-  venues: Array<{ name: string }>;
-  users: Array<{ displayName: string; roles: Array<{ role: string }> }>;
-}): string {
-  const eventLines = ctx.events
-    .map((e) => {
-      const date = format(toZonedTime(e.eventDate, TZ), "dd MMM yyyy", { timeZone: TZ });
-      const depts = e.departments.map((d) => d.department.name).join(", ") || "none";
-      const venues = e.eventVenues.map((v) => v.venue.name).join(", ") || "none";
-      const coord = e.coordinator?.displayName ?? "unassigned";
-      return `  - ${e.title} | ${e.status.replace(/_/g, " ")} | ${date} | Coordinator: ${coord} | Venues: ${venues} | Departments: ${depts}`;
-    })
-    .join("\n");
+function parseUserQuery(query: string): string {
+  const lower = query.toLowerCase().trim();
 
-  const deptLines = ctx.departments.map((d) => `  - ${d.name}`).join("\n");
-  const venueLines = ctx.venues.map((v) => `  - ${v.name}`).join("\n");
-  const staffLines = ctx.users
-    .map((u) => {
-      const roles = u.roles.map((r) => r.role).join(", ");
-      return `  - ${u.displayName} (${roles || "no role"})`;
-    })
-    .join("\n");
-
-  return `You are Speedy, the friendly AI assistant and official mascot of Bahrain International Circuit (BIC).
-You help BIC staff use the Function Sheet system (Version Beta 0.03) to coordinate internal events.
-
-Your personality: energetic, knowledgeable, professional, and concise. You know everything about BIC operations and this app.
-
-About the BIC Function Sheet system:
-- Manages internal events (concerts, corporate, motorsport, hospitality, etc.)
-- Event lifecycle: DRAFT → CONFIRMED → PROVISIONAL_FUNCTION_SHEET_SENT → FUNCTION_SHEET_SENT → IN_SETUP → LIVE → CLOSED → ARCHIVED
-- Coordinators create and manage events; Department Managers fill in requirements; Team Members execute assigned tasks
-- Venues, departments, and staff are all managed within this system
-- PDF function sheets can be generated and sent to departments
-- There are four user roles: ADMIN, COORDINATOR, DEPT_MANAGER, DEPT_TEAM_MEMBER
-
-Current date/time (Bahrain): ${ctx.datetime}
-
-## Active & Upcoming Events (${ctx.events.length})
-${eventLines || "  (no active events)"}
-
-## Departments (${ctx.departments.length})
-${deptLines || "  (none)"}
-
-## Venues (${ctx.venues.length})
-${venueLines || "  (none)"}
-
-## Staff (${ctx.users.length})
-${staffLines || "  (none)"}
-
-Answer questions helpfully and concisely. Use the real names of events, staff, departments, and venues from the data above. If you don't know something specific, say so honestly. Keep responses friendly but brief unless detail is needed.`;
+  if (lower.includes("help") || lower.includes("how do i") || lower.includes("how to")) {
+    return "help";
+  }
+  if (lower.includes("what") && (lower.includes("event") || lower.includes("coming") || lower.includes("upcoming"))) {
+    return "events";
+  }
+  if (lower.includes("department")) {
+    return "departments";
+  }
+  if (lower.includes("venue") || lower.includes("location")) {
+    return "venues";
+  }
+  if (lower.includes("staff") || lower.includes("coordinator") || lower.includes("member") || lower.includes("team")) {
+    return "staff";
+  }
+  if (lower.includes("status") && lower.includes("event")) {
+    return "event_status";
+  }
+  return "general";
 }
+
+async function generateResponse(
+  queryType: string,
+  userQuery: string,
+  context: {
+    events: Array<{
+      title: string;
+      status: string;
+      eventDate: Date;
+      coordinator: { displayName: string } | null;
+      departments: Array<{ department: { name: string } }>;
+      eventVenues: Array<{ venue: { name: string } }>;
+    }>;
+    departments: Array<{ name: string }>;
+    venues: Array<{ name: string }>;
+    users: Array<{ displayName: string; roles: Array<{ role: string }> }>;
+    datetime: string;
+  }
+): Promise<string> {
+  switch (queryType) {
+    case "events": {
+      if (context.events.length === 0) {
+        return "No active or upcoming events found. Check back soon or create a new event!";
+      }
+      const eventList = context.events
+        .map((e) => {
+          const date = format(toZonedTime(e.eventDate, TZ), "dd MMM yyyy", { timeZone: TZ });
+          const coordinator = e.coordinator?.displayName ?? "Unassigned";
+          return `• ${e.title} (${e.status.replace(/_/g, " ")}) - ${date} - Coordinator: ${coordinator}`;
+        })
+        .join("\n");
+      return `Here are the active and upcoming events:\n\n${eventList}`;
+    }
+
+    case "departments": {
+      if (context.departments.length === 0) {
+        return "No departments configured yet.";
+      }
+      const deptList = context.departments.map((d) => `• ${d.name}`).join("\n");
+      return `Our departments:\n\n${deptList}`;
+    }
+
+    case "venues": {
+      if (context.venues.length === 0) {
+        return "No venues configured yet.";
+      }
+      const venueList = context.venues.map((v) => `• ${v.name}`).join("\n");
+      return `Available venues:\n\n${venueList}`;
+    }
+
+    case "staff": {
+      if (context.users.length === 0) {
+        return "No staff members found.";
+      }
+      const staffList = context.users
+        .map((u) => {
+          const roles = u.roles.map((r) => r.role).join(", ") || "no role";
+          return `• ${u.displayName} (${roles})`;
+        })
+        .join("\n");
+      return `Team members:\n\n${staffList}`;
+    }
+
+    case "help": {
+      return `I'm Speedy, your BIC Function Sheet assistant! 🏎 I can help you with:
+
+• **Upcoming Events** - Ask "What events are coming up?" or "Show me events"
+• **Departments** - Ask "What departments do we have?"
+• **Venues** - Ask "What venues are available?"
+• **Staff** - Ask "Who are the team members?" or "Show staff"
+
+Just ask me anything about BIC's events and operations, and I'll provide accurate information from the system!`;
+    }
+
+    case "event_status": {
+      const eventMatch = context.events.find((e) =>
+        userQuery.toLowerCase().includes(e.title.toLowerCase())
+      );
+      if (eventMatch) {
+        const date = format(toZonedTime(eventMatch.eventDate, TZ), "dd MMM yyyy", { timeZone: TZ });
+        const coordinator = eventMatch.coordinator?.displayName ?? "Unassigned";
+        const depts = eventMatch.departments.map((d) => d.department.name).join(", ") || "None";
+        return `Event: ${eventMatch.title}\nStatus: ${eventMatch.status.replace(/_/g, " ")}\nDate: ${date}\nCoordinator: ${coordinator}\nDepartments: ${depts}`;
+      }
+      return "I couldn't find that specific event. Try asking about all events instead!";
+    }
+
+    default: {
+      return `I'm Speedy, your BIC AI assistant! 🏎 I help with events, departments, venues, and staff information. What would you like to know?`;
+    }
+  }
+}
+
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -93,99 +146,63 @@ export async function POST(req: NextRequest) {
     return new Response("Bad Request", { status: 400 });
   }
 
-  const [events, departments, venues, users] = await Promise.all([
-    prisma.event.findMany({
-      where: { status: { notIn: ["ARCHIVED"] } },
-      select: {
-        title: true,
-        status: true,
-        eventDate: true,
-        coordinator: { select: { displayName: true } },
-        departments: { select: { department: { select: { name: true } } } },
-        eventVenues: { select: { venue: { select: { name: true } } } },
-      },
-      orderBy: { eventDate: "asc" },
-      take: 20,
-    }),
-    prisma.department.findMany({
-      where: { isActive: true },
-      select: { name: true },
-      orderBy: { sortOrder: "asc" },
-    }),
-    prisma.venue.findMany({
-      where: { isActive: true },
-      select: { name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.user.findMany({
-      where: { isActive: true },
-      select: {
-        displayName: true,
-        roles: { select: { role: true } },
-      },
-      orderBy: { displayName: "asc" },
-    }),
-  ]);
-
-  const now = toZonedTime(new Date(), TZ);
-  const datetime = format(now, "EEEE, dd MMM yyyy HH:mm", { timeZone: TZ });
-
-  const systemPrompt = buildSystemPrompt({ datetime, events, departments, venues, users });
-
-  const apiKey = process.env.GOOGLE_AI_API_KEY;
-  if (!apiKey) {
-    const mockResponse =
-      "Hi there! I'm Speedy, your BIC AI assistant — I'm still warming up my engines! 🏎 The team is connecting me to the AI system shortly. In the meantime, feel free to explore the app. Check the Events page for upcoming events, the Calendar for a timeline view, or reach out to your coordinator for help!";
-    return new Response(mockResponse, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
-  }
+  const lastMessage = messages[messages.length - 1];
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
-      systemInstruction: systemPrompt,
+    const [events, departments, venues, users] = await Promise.all([
+      prisma.event.findMany({
+        where: { status: { notIn: ["ARCHIVED"] } },
+        select: {
+          title: true,
+          status: true,
+          eventDate: true,
+          coordinator: { select: { displayName: true } },
+          departments: { select: { department: { select: { name: true } } } },
+          eventVenues: { select: { venue: { select: { name: true } } } },
+        },
+        orderBy: { eventDate: "asc" },
+        take: 20,
+      }),
+      prisma.department.findMany({
+        where: { isActive: true },
+        select: { name: true },
+        orderBy: { sortOrder: "asc" },
+      }),
+      prisma.venue.findMany({
+        where: { isActive: true },
+        select: { name: true },
+        orderBy: { name: "asc" },
+      }),
+      prisma.user.findMany({
+        where: { isActive: true },
+        select: {
+          displayName: true,
+          roles: { select: { role: true } },
+        },
+        orderBy: { displayName: "asc" },
+      }),
+    ]);
+
+    const now = toZonedTime(new Date(), TZ);
+    const datetime = format(now, "EEEE, dd MMM yyyy HH:mm", { timeZone: TZ });
+
+    const queryType = parseUserQuery(lastMessage.content);
+    const response = await generateResponse(queryType, lastMessage.content, {
+      datetime,
+      events,
+      departments,
+      venues,
+      users,
     });
 
-    const history = messages.slice(0, -1).map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
-
-    const lastMessage = messages[messages.length - 1];
-
-    const chat = model.startChat({ history });
-    const result = await chat.sendMessageStream(lastMessage.content);
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        try {
-          for await (const chunk of result.stream) {
-            const text = chunk.text();
-            if (text) controller.enqueue(encoder.encode(text));
-          }
-        } catch (error) {
-          console.error("Stream chunk error:", error);
-          controller.error(new Error("Stream error"));
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
+    return new Response(response, {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   } catch (error) {
     console.error("Speedy API error:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("Error details:", errorMessage);
-    const mockResponse =
-      "Hi there! I'm Speedy, your BIC AI assistant — I'm still warming up my engines! 🏎 The team is connecting me to the AI system shortly. In the meantime, feel free to explore the app. Check the Events page for upcoming events, the Calendar for a timeline view, or reach out to your coordinator for help!";
-    return new Response(mockResponse, {
+    return new Response("Sorry, I encountered an issue. Please try again.", {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
+      status: 500,
     });
   }
 }
